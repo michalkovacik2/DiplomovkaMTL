@@ -36,6 +36,8 @@ def init_parser(train):
         parser.add_argument('--saveDir',    type=str, help='save directory')
         parser.add_argument('--endEpoch',   type=int, help='end of epoch')
         parser.add_argument('--checkpoint', type=int, help='Checkpoint interval when the model is saved')
+        parser.add_argument('--stopWhen',   type=int,
+                            help='Stop after the validation loss was not better after %in%', default=20)
 
     return parser
 
@@ -54,7 +56,8 @@ def print_parameters(args, train):
     if train:
         print(f'\tend epoch           = {args.endEpoch}\n'
               f'\tsave dir            = {args.saveDir}\n'
-              f'\tcheckpoint interval = {args.checkpoint}\n')
+              f'\tcheckpoint interval = {args.checkpoint}\n'
+              f'\tstop when           = {args.stopWhen}')
 
 
 def main():
@@ -188,17 +191,19 @@ def main():
                       f'{total_gender_loss_val:.4f},{total_race_loss_val:.4f}')
 
             if total_validation_loss_val < best_loss:
+                print(f'Found better model loss = {total_validation_loss_val} epoch = {epoch}')
                 best_loss = total_validation_loss_val
+                best_loss_epoch = epoch
                 torch.save({"model_state_dict": model.state_dict(),
                             "optimzier_state_dict": optimizer.state_dict()
-                            }, "best.pth")
+                            }, f"{args.saveDir}best.pth")
 
             torch.save({"model_state_dict": model.state_dict(),
                         "optimzier_state_dict": optimizer.state_dict()
-                        }, f"last.pth")
+                        }, f"{args.saveDir}last.pth")
 
-            if best_loss_epoch != -1 and (epoch - best_loss_epoch) >= 20:
-                print('We did not find better loss after 20 epochs. ENDING TRAINING')
+            if best_loss_epoch != -1 and (epoch - best_loss_epoch) >= args.stopWhen:
+                print(f'We did not find better loss after {args.stopWhen} epochs. ENDING TRAINING')
                 return
 
 
