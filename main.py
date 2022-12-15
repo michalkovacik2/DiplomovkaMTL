@@ -25,18 +25,21 @@ def load_annotations():
 
 def init_parser(train):
     parser = argparse.ArgumentParser(prog='MultiTask learning')
-    parser.add_argument('--batchSize',     type=int, help='batch size')
-    parser.add_argument('--inputSize',     type=int, help='resolution of input')
-    parser.add_argument('--backbone',      type=str, help='Type of backbone [resnet18, resnet101]')
-    parser.add_argument('--ageHead',       type=int, help='If age head is present')
-    parser.add_argument('--genderHead',    type=int, help='If gender head is present')
-    parser.add_argument('--ethnicityHead', type=int, help='If ethnicity head is present')
-    parser.add_argument('--model',         type=str, help='path to model', default=None)
+    parser.add_argument('--batchSize',     type=int,   help='batch size')
+    parser.add_argument('--inputSize',     type=int,   help='resolution of input')
+    parser.add_argument('--backbone',      type=str,   help='Type of backbone [resnet18, resnet101]')
+    parser.add_argument('--ageHead',       type=int,   help='If age head is present')
+    parser.add_argument('--genderHead',    type=int,   help='If gender head is present')
+    parser.add_argument('--ethnicityHead', type=int,   help='If ethnicity head is present')
+    parser.add_argument('--model',         type=str,   help='path to model', default=None)
     if train:
-        parser.add_argument('--saveDir',    type=str, help='save directory')
-        parser.add_argument('--endEpoch',   type=int, help='end of epoch')
-        parser.add_argument('--checkpoint', type=int, help='Checkpoint interval when the model is saved')
-        parser.add_argument('--stopWhen',   type=int,
+        parser.add_argument('--ageCoef',       type=float, help='Coefficient for age head', default=1.0)
+        parser.add_argument('--genderCoef',    type=float, help='Coefficient for gender head', default=1.0)
+        parser.add_argument('--ethnicityCoef', type=float, help='Coefficient for ethnicity head', default=1.0)
+        parser.add_argument('--saveDir',       type=str,  help='save directory')
+        parser.add_argument('--endEpoch',      type=int,  help='end of epoch')
+        parser.add_argument('--checkpoint',    type=int,  help='Checkpoint interval when the model is saved')
+        parser.add_argument('--stopWhen',      type=int,
                             help='Stop after the validation loss was not better after %in%', default=20)
 
     return parser
@@ -45,19 +48,22 @@ def init_parser(train):
 def print_parameters(args, train):
     print('Training init ...' if train else 'Get results init ...')
     print('Current parameters:')
-    print(f'\tBatch size          = {args.batchSize}\n'
-          f'\tModel path          = {args.model}\n'
-          f'\tInput res.          = {args.inputSize} x {args.inputSize}\n'
-          f'\tbackbone            = {args.backbone}\n'
-          f'\tAge head            = {True if args.ageHead == 1 else False}\n'
-          f'\tGender head         = {True if args.genderHead == 1 else False}\n'
-          f'\tEthnicity head      = {True if args.ethnicityHead == 1 else False}')
+    print(f'\tBatch size            = {args.batchSize}\n'
+          f'\tModel path            = {args.model}\n'
+          f'\tInput res.            = {args.inputSize} x {args.inputSize}\n'
+          f'\tbackbone              = {args.backbone}\n'
+          f'\tAge head              = {True if args.ageHead == 1 else False}\n'
+          f'\tGender head           = {True if args.genderHead == 1 else False}\n'
+          f'\tEthnicity head        = {True if args.ethnicityHead == 1 else False}')
     # Additional parameters for training
     if train:
-        print(f'\tend epoch           = {args.endEpoch}\n'
-              f'\tsave dir            = {args.saveDir}\n'
-              f'\tcheckpoint interval = {args.checkpoint}\n'
-              f'\tstop when           = {args.stopWhen}')
+        print(f'\tend epoch             = {args.endEpoch}\n'
+              f'\tsave dir              = {args.saveDir}\n'
+              f'\tcheckpoint interval   = {args.checkpoint}\n'
+              f'\tstop when             = {args.stopWhen}\n'
+              f'\tage coefficient       = {args.ageCoef}\n'
+              f'\tgender coefficient    = {args.genderCoef}\n'
+              f'\tethnicity coefficient = {args.ethnicityCoef}')
 
 
 def main():
@@ -141,8 +147,11 @@ def main():
             age_output, gender_output, race_output = model(inputs)
 
             loss1 = 0 if race_output is None else ethnicity_loss(race_output, race_label)
+            loss1 *= args.ethnicityCoef
             loss2 = 0 if gender_output is None else gender_loss(sig(gender_output), gender_label.unsqueeze(1).float())
+            loss2 *= args.genderCoef
             loss3 = 0 if age_output is None else age_loss(age_output, age_label.unsqueeze(1).float())
+            loss3 *= args.ageCoef
             loss = loss1 + loss2 + loss3
             loss.backward()
             optimizer.step()
@@ -177,9 +186,12 @@ def main():
                     age_output, gender_output, race_output = model(inputs)
 
                     loss1 = 0 if race_output is None else ethnicity_loss(race_output, race_label)
+                    loss1 *= args.ethnicityCoef
                     loss2 = 0 if gender_output is None else gender_loss(sig(gender_output),
                                                                         gender_label.unsqueeze(1).float())
+                    loss2 *= args.genderCoef
                     loss3 = 0 if age_output is None else age_loss(age_output, age_label.unsqueeze(1).float())
+                    loss3 *= args.ageCoef
                     loss = loss1 + loss2 + loss3
 
                     total_validation_loss_val += loss
